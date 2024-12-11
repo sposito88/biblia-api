@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  mariadb:
+    image: mariadb:10.9
+    container_name: mariadb2
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: biblia
+      MYSQL_USER: biblia_user
+      MYSQL_PASSWORD: 123456
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+      - ./biblia_13V.sql:/docker-entrypoint-initdb.d/biblia_13V.sql
+
+  api:
+    build:
+      context: .
+    container_name: biblia-api2
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DB_HOST: mariadb
+      DB_USER: biblia_user
+      DB_PASSWORD: 123456
+      DB_DATABASE: biblia
+      DB_PORT: 3306
+    depends_on:
+      - mariadb
+    volumes:
+      - .:/app
+
+volumes:
+  mariadb_data:
