@@ -1,9 +1,9 @@
-require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
-
-const app = express();
-const port = 3000;
+const cors = require('cors');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const path = require('path');
 
 // Conexão com o banco de dados
 const pool = mysql.createPool({
@@ -14,11 +14,59 @@ const pool = mysql.createPool({
   port: process.env.DB_PORT,
 });
 
-// Middleware para logs detalhados de todas as requisições
-app.use((req, res, next) => {
-  console.log(`Requisição recebida: ${req.method} ${req.url}`);
-  next();
-});
+const app = express(); // Certifique-se de que app está definido aqui
+const port = 3000;
+
+// Configuração do Swagger
+const swaggerOptions = {
+  definition: {
+    openapi: '3.0.0',
+    info: {
+      title: 'API da Bíblia',
+      version: '1.0.0',
+      description: 'Documentação interativa da API da Bíblia',
+    },
+    servers: [
+      {
+        url: 'http://apibiblia.com.br:3000',
+        description: 'Servidor de Produção',
+      },
+    ],
+  },
+  apis: ['./server.js'], // Ajuste conforme necessário
+};
+
+const swaggerSpec = swaggerJsdoc(swaggerOptions);
+
+// Middleware para servir arquivos estáticos
+app.use('/api-docs/static', express.static(path.join(__dirname, 'node_modules', 'swagger-ui-dist')));
+
+// Middleware do Swagger UI
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+
+
+// Configurar CORS
+const allowedOrigins = [
+  'http://apibiblia.com.br',
+  'https://apibiblia.com.br',
+  'http://www.apibiblia.com.br',
+  'https://www.apibiblia.com.br',
+  'http://localhost:3000',
+];
+
+app.use(cors({
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Origin não permitida pelo CORS'));
+    }
+  },
+}));
+
+// Middleware para interpretar JSON
+app.use(express.json());
 
 // Middleware global para capturar erros
 app.use((err, req, res, next) => {
@@ -31,6 +79,33 @@ app.get('/', (req, res) => {
   res.send('API da Bíblia está funcionando!');
 });
 
+/**
+ * @swagger
+ * /livros:
+ *   get:
+ *     summary: Retorna todos os livros da Bíblia
+ *     description: Obtém uma lista com todos os livros, incluindo seus detalhes.
+ *     responses:
+ *       200:
+ *         description: Lista de livros retornada com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   liv_id:
+ *                     type: integer
+ *                     description: ID do livro.
+ *                   liv_nome:
+ *                     type: string
+ *                     description: Nome do livro.
+ *                   liv_abreviado:
+ *                     type: string
+ *                     description: Abreviação do livro.
+ */
+
 // Rota para listar todos os livros
 app.get('/livros', async (req, res) => {
   try {
@@ -41,6 +116,40 @@ app.get('/livros', async (req, res) => {
     res.status(500).send('Erro ao buscar os livros');
   }
 });
+
+/**
+ * @swagger
+ * /livros/{id}:
+ *   get:
+ *     summary: Retorna um livro específico
+ *     description: Obtém os detalhes de um livro específico pelo seu ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do livro.
+ *     responses:
+ *       200:
+ *         description: Livro retornado com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 liv_id:
+ *                   type: integer
+ *                   description: ID do livro.
+ *                 liv_nome:
+ *                   type: string
+ *                   description: Nome do livro.
+ *                 liv_abreviado:
+ *                   type: string
+ *                   description: Abreviação do livro.
+ *       404:
+ *         description: Livro não encontrado.
+ */
 
 // Rota para obter um livro por ID
 app.get('/livros/:id', async (req, res) => {
@@ -57,6 +166,30 @@ app.get('/livros/:id', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /testamentos:
+ *   get:
+ *     summary: Retorna todos os testamentos
+ *     description: Obtém uma lista com todos os testamentos disponíveis.
+ *     responses:
+ *       200:
+ *         description: Lista de testamentos retornada com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   tes_id:
+ *                     type: integer
+ *                     description: ID do testamento.
+ *                   tes_nome:
+ *                     type: string
+ *                     description: Nome do testamento.
+ */
+
 // Rota para listar todos os testamentos
 app.get('/testamentos', async (req, res) => {
   try {
@@ -68,6 +201,57 @@ app.get('/testamentos', async (req, res) => {
   }
 });
 
+
+/**
+ * @swagger
+ * /versiculos:
+ *   get:
+ *     summary: Busca versículos
+ *     description: Retorna versículos com base em critérios de busca como livro, capítulo, versículo e abreviação.
+ *     parameters:
+ *       - in: query
+ *         name: liv_id
+ *         schema:
+ *           type: integer
+ *         description: ID do livro.
+ *       - in: query
+ *         name: capitulo
+ *         schema:
+ *           type: integer
+ *         description: Número do capítulo.
+ *       - in: query
+ *         name: versiculo
+ *         schema:
+ *           type: integer
+ *         description: Número do versículo.
+ *       - in: query
+ *         name: abreviacao
+ *         schema:
+ *           type: string
+ *         description: Abreviação da versão da Bíblia.
+ *     responses:
+ *       200:
+ *         description: Versículos retornados com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   ver_liv_id:
+ *                     type: integer
+ *                     description: ID do livro.
+ *                   ver_capitulo:
+ *                     type: integer
+ *                     description: Número do capítulo.
+ *                   ver_versiculo:
+ *                     type: integer
+ *                     description: Número do versículo.
+ *                   ver_texto:
+ *                     type: string
+ *                     description: Texto do versículo.
+ */
 // Rota para buscar versículos
 app.get('/versiculos', async (req, res) => {
   const { liv_id, capitulo, versiculo, abreviacao } = req.query;
@@ -106,6 +290,39 @@ app.get('/versiculos', async (req, res) => {
   }
 });
 
+/**
+ * @swagger
+ * /pesquisar:
+ *   get:
+ *     summary: Pesquisa versículos
+ *     description: Realiza uma pesquisa por texto completo nos versículos.
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Termo de busca.
+ *     responses:
+ *       200:
+ *         description: Resultados da pesquisa retornados com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   ver_id:
+ *                     type: integer
+ *                     description: ID do versículo.
+ *                   ver_texto:
+ *                     type: string
+ *                     description: Texto do versículo.
+ *       400:
+ *         description: Parâmetro de busca 'q' não fornecido.
+ */
+
 // Rota para pesquisar versículos por texto
 app.get('/pesquisar', async (req, res) => {
   const { q } = req.query;
@@ -122,6 +339,30 @@ app.get('/pesquisar', async (req, res) => {
   }
 });
 
+
+/**
+ * @swagger
+ * /versoes:
+ *   get:
+ *     summary: Lista as versões disponíveis
+ *     description: Retorna todas as versões da Bíblia disponíveis na API.
+ *     responses:
+ *       200:
+ *         description: Versões retornadas com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   vrs_id:
+ *                     type: integer
+ *                     description: ID da versão.
+ *                   vrs_abreviacao:
+ *                     type: string
+ *                     description: Abreviação da versão.
+ */
 // Rota para listar versões disponíveis
 app.get('/versoes', async (req, res) => {
   try {
@@ -132,6 +373,43 @@ app.get('/versoes', async (req, res) => {
     res.status(500).send('Erro ao buscar as versões');
   }
 });
+
+/**
+ * @swagger
+ * /{abreviacao}/random:
+ *   get:
+ *     summary: Retorna um versículo aleatório
+ *     description: Obtém um versículo aleatório baseado na abreviação fornecida.
+ *     parameters:
+ *       - in: path
+ *         name: abreviacao
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Abreviação da versão da Bíblia.
+ *     responses:
+ *       200:
+ *         description: Versículo retornado com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 livro:
+ *                   type: integer
+ *                   description: ID do livro.
+ *                 capitulo:
+ *                   type: integer
+ *                   description: Número do capítulo.
+ *                 versiculo:
+ *                   type: integer
+ *                   description: Número do versículo.
+ *                 texto:
+ *                   type: string
+ *                   description: Texto do versículo.
+ *       404:
+ *         description: Nenhum versículo encontrado para a abreviação fornecida.
+ */
 
 // Rota para obter um versículo aleatório por abreviação
 app.get('/:abreviacao/random', async (req, res) => {

@@ -16,6 +16,7 @@ services:
       - mariadb_data:/var/lib/mysql
       - ./biblia_13V.sql:/docker-entrypoint-initdb.d/biblia_13V.sql
 
+
   api:
     build:
       context: .
@@ -33,6 +34,5 @@ services:
       - mariadb
     volumes:
       - .:/app
-
 volumes:
   mariadb_data:

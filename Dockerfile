@@ -11,7 +11,12 @@ COPY . .
 # Instalar dependências
 RUN npm install
 RUN npm install mysql2
+RUN npm install express
+RUN npm install notenv
+RUN npm install cors
+RUN npm install swagger-ui-express swagger-jsdoc
 
+RUN chmod -R 777 /app/node_modules
 # Expôr a porta do servidor
 EXPOSE 3000
 
