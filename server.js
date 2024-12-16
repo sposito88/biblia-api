@@ -168,6 +168,135 @@ app.get('/livros/:id', async (req, res) => {
 
 /**
  * @swagger
+ * /livros/{id}/capitulos:
+ *   get:
+ *     summary: Retorna os capítulos de um livro específico
+ *     description: Obtém os capítulos de um livro pelo seu ID.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do livro.
+ *     responses:
+ *       200:
+ *         description: Capítulos retornados com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   capitulo_id:
+ *                     type: integer
+ *                     description: ID do capítulo.
+ *                   numero:
+ *                     type: integer
+ *                     description: Número do capítulo.
+ *       404:
+ *         description: Livro não encontrado.
+ */
+
+// Rota para listar os capítulos de um livro
+app.get('/livros/:id/capitulos', async (req, res) => {
+  const { id } = req.params; // ID do livro
+  try {
+    const [rows] = await pool.query(
+      `SELECT DISTINCT ver_capitulo AS capitulo_numero
+       FROM versiculos
+       WHERE ver_liv_id = ?
+       ORDER BY ver_capitulo`,
+      [id]
+    );
+
+    if (rows.length === 0) {
+      return res.status(404).send({ error: 'Nenhum capítulo encontrado para o livro especificado' });
+    }
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Erro ao buscar capítulos:', error.message);
+    res.status(500).send('Erro ao buscar capítulos');
+  }
+});
+
+/**
+ * @swagger
+ * /livros/{id}/capitulos/{capituloId}/versiculos:
+ *   get:
+ *     summary: Retorna os versículos de um capítulo específico
+ *     description: Obtém os versículos de um capítulo específico pelo ID do livro e ID do capítulo.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do livro.
+ *       - in: path
+ *         name: capituloId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *         description: ID do capítulo.
+ *     responses:
+ *       200:
+ *         description: Versículos retornados com sucesso.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   versiculo_id:
+ *                     type: integer
+ *                     description: ID do versículo.
+ *                   texto:
+ *                     type: string
+ *                     description: Texto do versículo.
+ *       404:
+ *         description: Capítulo não encontrado.
+ */
+
+// Rota para listar os versículos de um capítulo
+app.get('/livros/:id/capitulos/:capituloId/versiculos', async (req, res) => {
+  const { id, capituloId } = req.params;
+  const { versao } = req.query; // Parâmetro da versão da Bíblia (opcional)
+
+  try {
+    let query = `
+      SELECT v.ver_versiculo, v.ver_texto, vs.vrs_abreviacao AS versao
+      FROM versiculos v
+      JOIN versoes vs ON v.ver_vrs_id = vs.vrs_id
+      WHERE v.ver_liv_id = ? AND v.ver_capitulo = ?
+    `;
+    const params = [id, capituloId];
+
+    // Adiciona filtro pela versão se o parâmetro 'versao' for enviado
+    if (versao) {
+      query += ' AND LOWER(vs.vrs_abreviacao) = LOWER(?)';
+      params.push(versao);
+    }
+
+    const [rows] = await pool.query(query, params);
+
+    if (rows.length === 0) {
+      return res.status(404).send({ error: 'Nenhum versículo encontrado para o capítulo e versão especificados' });
+    }
+
+    res.json(rows);
+  } catch (error) {
+    console.error('Erro ao buscar versículos:', error.message);
+    res.status(500).send('Erro ao buscar versículos');
+  }
+});
+
+
+/**
+ * @swagger
  * /testamentos:
  *   get:
  *     summary: Retorna todos os testamentos
